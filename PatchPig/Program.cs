@@ -180,8 +180,8 @@ namespace PatchPig
                 else
                     Console.WriteLine("Adding " + name + " (" + width + "x" + height + ") (" + (remap ? "remapped palette" : "equal palette") + ") (new size = " + newSize + ", original size = " + orgSize + ")");
                 ms.Position = imgDataOfs + pigImg.Offset;
-                ms.Write(BitConverter.GetBytes((int)enc.Length + 4));
-                ms.Write(enc);
+                ms.Write(BitConverter.GetBytes((int)enc.Length + 4), 0, 4);
+                ms.Write(enc, 0, enc.Length);
             }
             File.WriteAllBytes("new.pig", ms.ToArray());
         }
