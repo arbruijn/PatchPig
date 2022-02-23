@@ -24,14 +24,8 @@ namespace PatchPig
             return colors;
         }
 
-        static void Main(string[] args)
+        static void Run(string[] args)
         {
-            if (args.Length == 0)
-            {
-                Console.WriteLine("Usage: PatchPig bitmap1.bmp bitmap2.bmp:bitmapname ...");
-                return;
-            }
-        
             var dpal = new byte[256 * 3];
             var colorDict = new Dictionary<Color, byte>();
             Console.WriteLine("Reading Descent 1 palette from palette.256");
@@ -184,6 +178,24 @@ namespace PatchPig
                 ms.Write(enc, 0, enc.Length);
             }
             File.WriteAllBytes("new.pig", ms.ToArray());
+        }
+
+        static void Main(string[] args)
+        {
+            if (args.Length == 0)
+            {
+                Console.WriteLine("Usage: PatchPig bitmap1.bmp bitmap2.bmp:bitmapname ...");
+                return;
+            }
+            try
+            {
+                Run(args);
+            }
+            catch (FileNotFoundException ex)
+            {
+                Console.WriteLine("File not found: " + ex.FileName);
+                Console.WriteLine("Aborted.");
+            }
         }
     }
 }
