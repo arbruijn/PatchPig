@@ -178,10 +178,13 @@ namespace PatchPig
                 ms.Write(enc, 0, enc.Length);
             }
             File.WriteAllBytes("new.pig", ms.ToArray());
+            Console.WriteLine("Created new.pig");
         }
 
         static void Main(string[] args)
         {
+            Console.WriteLine("PatchPig v0.91");
+            Console.WriteLine();
             if (args.Length == 0)
             {
                 Console.WriteLine("Usage: PatchPig bitmap1.bmp bitmap2.bmp:bitmapname ...");
