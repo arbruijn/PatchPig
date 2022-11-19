@@ -210,7 +210,7 @@ namespace PatchPig
 
         static void Main(string[] args)
         {
-            Console.WriteLine("PatchPig v0.91");
+            Console.WriteLine("PatchPig v0.92");
             Console.WriteLine();
             if (args.Length == 0)
             {
