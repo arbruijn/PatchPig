@@ -39,13 +39,15 @@ namespace PatchPig
             var pig = new Descent1PIGFile();
             var pigData = File.ReadAllBytes("descent.pig");
             pig.Read(new MemoryStream(pigData));
-            var pigImgs = new Dictionary<string, PIGImage>();
-            foreach (var img in pig.Bitmaps)
+            var pigImgIdx = new Dictionary<string, int>();
+            var bitmaps = pig.Bitmaps;
+            for (int i = 0; i < bitmaps.Count; i++)
             {
+                var img = bitmaps[i];
                 string name = img.Name;
                 if (img.IsAnimated)
                     name += "#" + img.Frame;
-                pigImgs.Add(name, img);
+                pigImgIdx.Add(name, i);
             }
             var ms = new MemoryStream(pigData);
             var pr = new BinaryReader(ms);
@@ -56,7 +58,7 @@ namespace PatchPig
             var imgDataOfs = mediaOfs + 8 + imgCount * 17 + sndCount * 20;
 
             var fns = new List<Tuple<string, string>>();
-             foreach (var arg in args)
+            foreach (var arg in args)
             {
                 int j = arg.LastIndexOf(':');
                 string filename = j >= 2 ? arg.Substring(0, j) : arg;
@@ -66,12 +68,14 @@ namespace PatchPig
             foreach (var x in fns) {
                 string fn = x.Item1;
                 string name = x.Item2;
+                int bitmapIdx;
                 PIGImage pigImg;
-                if (!pigImgs.TryGetValue(name, out pigImg))
+                if (!pigImgIdx.TryGetValue(name, out bitmapIdx))
                 {
-                	Console.WriteLine("Bitmap " + name + " not found in pig, skipped.");
-                	continue;
+                    Console.WriteLine("Bitmap " + name + " not found in pig, skipped.");
+                    continue;
                 }
+                pigImg = bitmaps[bitmapIdx];
                 
                 Console.WriteLine("Reading bmp bitmap from " + fn);
                 var r = new BinaryReader(File.OpenRead(fn));
@@ -166,16 +170,39 @@ namespace PatchPig
                     data = bmpData;
                     height = -height;
                 }
-                var enc = RLEEncoder.EncodeImage(width, height, data, out bool big);
-                var newSize = enc.Length < data.Length ? 4 + enc.Length : data.Length;
+                byte[] enc = null;
+                try
+                {
+                    enc = RLEEncoder.EncodeImage(width, height, data, out bool big);
+                }
+                catch (Exception e)
+                {
+                    if (e.Message != "Image cannot compress efficiently.")
+                        throw e;
+                }
+                if (enc != null && enc.Length + 4 >= data.Length)
+                    enc = null;
+                var newSize = enc != null ? 4 + enc.Length : data.Length;
                 var orgSize = pigImg.GetSize();
                 if (newSize > orgSize)
+                {
                     Console.WriteLine("Failed to add " + name + " (" + width + "x" + height + ") new size = " + newSize + ", original size = " + orgSize);
-                else
-                    Console.WriteLine("Adding " + name + " (" + width + "x" + height + ") (" + (remap ? "remapped palette" : "equal palette") + ") (new size = " + newSize + ", original size = " + orgSize + ")");
+                    continue;
+                }
+                Console.WriteLine("Adding " + name + " (" + width + "x" + height + ") (" + (remap ? "remapped palette" : "equal palette") + ") (new size = " + newSize + ", original size = " + orgSize + ")");
                 ms.Position = imgDataOfs + pigImg.Offset;
-                ms.Write(BitConverter.GetBytes((int)enc.Length + 4), 0, 4);
-                ms.Write(enc, 0, enc.Length);
+                if (enc != null) {
+                    ms.Write(BitConverter.GetBytes((int)enc.Length + 4), 0, 4);
+                    ms.Write(enc, 0, enc.Length);
+                } else {
+                    ms.Write(data, 0, data.Length);
+                }
+                ms.Position = mediaOfs + 8 + (bitmapIdx - 1) * 17 + 8 + 3; // ofs flags
+                pigImg.Flags = (byte)((pigImg.Flags & ~PIGImage.BM_FLAG_RLE) |
+                    (enc != null ? PIGImage.BM_FLAG_RLE : 0));
+                byte[] flagsBuf = new byte[1];
+                flagsBuf[0] = pigImg.Flags;
+                ms.Write(flagsBuf, 0, flagsBuf.Length);
             }
             File.WriteAllBytes("new.pig", ms.ToArray());
             Console.WriteLine("Created new.pig");
